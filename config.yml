@@ -1,7 +1,7 @@
 - name: json_log
   format: "$json_content"
   source_files:
-    - ./test/req_20211230-15.log
+    - ./test/demo.log
   relabel_config:
     source_labels:
       - componentName
