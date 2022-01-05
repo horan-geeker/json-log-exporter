@@ -3,16 +3,12 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hpcloud/tail"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/songjiayang/nginx-log-exporter/config"
 	"log"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/hpcloud/tail"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/satyrius/gonx"
-
-	"github.com/songjiayang/nginx-log-exporter/config"
 )
 
 // Collector is a struct containing pointers to all metrics that should be
@@ -105,19 +101,15 @@ func (c *Collector) Run() {
 				dynamicValues = []string{
 					c.formatValue("componentName", data.ComponentName),
 					c.formatValue("interfaceName", data.InterfaceName),
-					c.formatValue("costTime", strconv.Itoa(data.CostTime)),
+					c.formatValue("returnCode", strconv.Itoa(data.ReturnCode)),
 				}
 
 				labelValues := append(c.externalValues, dynamicValues...)
 
 				c.countTotal.WithLabelValues(labelValues...).Inc()
 
-				//if bytes, err := entry.FloatField("body_bytes_sent"); err == nil {
-				//	c.bytesTotal.WithLabelValues(labelValues...).Add(bytes)
-				//}
-				//
-				//c.updateHistogramMetric(c.upstreamSeconds, labelValues, entry, "upstream_response_time")
-				//c.updateHistogramMetric(c.responseSeconds, labelValues, entry, "request_time")
+				c.updateHistogramMetric(c.upstreamSeconds, labelValues, "upstream_response_time", float64(data.Timestamp))
+				c.updateHistogramMetric(c.responseSeconds, labelValues, "request_time", float64(data.Timestamp + data.CostTime))
 			}
 		}()
 	}
@@ -142,28 +134,12 @@ func (c *Collector) formatValue(label, value string) string {
 	return value
 }
 
-func (c *Collector) updateHistogramMetric(metric *prometheus.HistogramVec, labelValues []string, entry *gonx.Entry, field string) {
-	value, err := entry.FloatField(field)
-	if err != nil {
-		//sometime the value duration
-		field, err := entry.Field(field)
-		if err != nil {
-			return
-		}
-		duration, err := time.ParseDuration(field)
-		if err != nil {
-			return
-		}
-		value = duration.Seconds()
-	}
+func (c *Collector) updateHistogramMetric(metric *prometheus.HistogramVec, labelValues []string, name string, timestamp float64) {
 
-	exemplarLabels := c.cfg.ExemplarMatch(entry, field)
-	if exemplarLabels == nil {
-		metric.WithLabelValues(labelValues...).Observe(value)
-		return
-	}
+	exemplarLabels := prometheus.Labels{}
+	exemplarLabels[name] = name
 
 	metric.WithLabelValues(labelValues...).(prometheus.ExemplarObserver).ObserveWithExemplar(
-		value, *exemplarLabels,
+		timestamp, exemplarLabels,
 	)
 }

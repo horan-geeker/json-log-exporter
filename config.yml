@@ -6,5 +6,6 @@
     source_labels:
       - componentName
       - interfaceName
-      - costTime
+      - returnCode
+      - event
   histogram_buckets: [0.1, 0.3, 0.5, 1, 2]
