@@ -1,8 +1,10 @@
 package collector
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,7 +28,6 @@ type Collector struct {
 	dynamicValueLen int
 
 	cfg    *config.AppConfig
-	parser *gonx.Parser
 }
 
 func NewCollector(cfg *config.AppConfig) *Collector {
@@ -67,7 +68,6 @@ func NewCollector(cfg *config.AppConfig) *Collector {
 		dynamicValueLen: len(dynamicLabels),
 
 		cfg:    cfg,
-		parser: gonx.NewParser(cfg.Format),
 	}
 }
 
@@ -92,8 +92,9 @@ func (c *Collector) Run() {
 		}
 
 		go func() {
+			var data config.JsonFormat
 			for line := range t.Lines {
-				entry, err := c.parser.ParseString(line.Text)
+				err := json.Unmarshal([]byte(line.Text), &data)
 				if err != nil {
 					fmt.Printf("error while parsing line '%s': %s", line.Text, err)
 					continue
@@ -101,22 +102,22 @@ func (c *Collector) Run() {
 
 				dynamicValues := make([]string, c.dynamicValueLen)
 
-				for i, label := range c.dynamicLabels {
-					if s, err := entry.Field(label); err == nil {
-						dynamicValues[i] = c.formatValue(label, s)
-					}
+				dynamicValues = []string{
+					c.formatValue("componentName", data.ComponentName),
+					c.formatValue("interfaceName", data.InterfaceName),
+					c.formatValue("costTime", strconv.Itoa(data.CostTime)),
 				}
 
 				labelValues := append(c.externalValues, dynamicValues...)
 
 				c.countTotal.WithLabelValues(labelValues...).Inc()
 
-				if bytes, err := entry.FloatField("body_bytes_sent"); err == nil {
-					c.bytesTotal.WithLabelValues(labelValues...).Add(bytes)
-				}
-
-				c.updateHistogramMetric(c.upstreamSeconds, labelValues, entry, "upstream_response_time")
-				c.updateHistogramMetric(c.responseSeconds, labelValues, entry, "request_time")
+				//if bytes, err := entry.FloatField("body_bytes_sent"); err == nil {
+				//	c.bytesTotal.WithLabelValues(labelValues...).Add(bytes)
+				//}
+				//
+				//c.updateHistogramMetric(c.upstreamSeconds, labelValues, entry, "upstream_response_time")
+				//c.updateHistogramMetric(c.responseSeconds, labelValues, entry, "request_time")
 			}
 		}()
 	}
