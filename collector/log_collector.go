@@ -102,6 +102,7 @@ func (c *Collector) Run() {
 					c.formatValue("componentName", data.ComponentName),
 					c.formatValue("interfaceName", data.InterfaceName),
 					c.formatValue("returnCode", strconv.Itoa(data.ReturnCode)),
+					c.formatValue("event", data.Event),
 				}
 
 				labelValues := append(c.externalValues, dynamicValues...)
